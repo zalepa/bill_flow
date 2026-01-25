@@ -31,4 +31,26 @@ class ClientTest < ActiveSupport::TestCase
       assert client.valid?, "#{email.inspect} should be valid"
     end
   end
+
+  test "has a collection of projects" do
+    client = clients(:acme)
+    assert_respond_to client, :projects
+  end
+
+  test "a client can have zero projects" do
+    client = Client.create!(name: "No Projects", email: "test@example.com", company: "No Projects Inc")
+    assert_equal 0, client.projects.count
+  end
+
+  test "a client can have one or more projects" do
+    client = clients(:acme)
+
+    client.projects.destroy_all
+
+    client.projects.create(name: "Project 1")
+    assert_equal 1, client.projects.count
+
+    client.projects.create(name: "Project 2")
+    assert_equal 2, client.projects.count
+  end
 end

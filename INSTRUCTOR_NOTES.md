@@ -89,6 +89,27 @@ Feedback and observations from code reviews throughout the Rails Mastery project
 
 ---
 
+## Day 7 - Project Model Setup (Grade: 90)
+
+**What was built:** Project model with belongs_to Client, name, description, hourly_rate (cents), status enum. Migration with foreign key constraints. Model validations and tests.
+
+**Strengths:**
+- Correct foreign key constraint via `belongs_to :client, null: false, foreign_key: true`
+- Smart choice to store hourly_rate as integer cents to avoid floating point issues - this is industry best practice (Stripe does the same)
+- Modern Rails 7+ enum syntax: `enum :status, [ :active, :archived, :completed ]`
+- Good validation: `numericality: { greater_than_or_equal_to: 0 }`
+- Thorough tests covering association, presence, numericality, and enum behavior (including ArgumentError on invalid status)
+- Correctly updated Client model with `has_many :projects, dependent: :destroy`
+
+**Areas for improvement:**
+- Consider naming the column `hourly_rate_cents` to make the unit explicit - common Rails convention used by gems like money-rails
+- Index on `name` is questionable utility; a composite index on `[client_id, status]` would better serve queries like "all active projects for this client"
+- Fixture uses `status: 0` instead of `status: :active` - works but less readable
+
+**Key takeaway:** Good instinct on money handling. Storing cents as integers is the right call for a billing app.
+
+---
+
 ## Day 6 - Client Model Setup (Grade: 89)
 
 **What was built:** Client model with name, email, company, phone, notes fields. Migration with indexes. Model validations and tests.

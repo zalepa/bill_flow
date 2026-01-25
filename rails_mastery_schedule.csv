@@ -5,7 +5,7 @@ Day,Phase,Type,Topic,Activity,Resource,Completed,Grade
 4,1 - Core Deep Dive,Learn,Active Record Internals,Study Arel and how AR builds SQL. Run `to_sql` on complex queries. Practice joins vs includes vs eager_load vs preload.,Rails source - activerecord/lib/arel,x,80
 5,1 - Core Deep Dive,Learn,Active Record Internals,Study AR callbacks lifecycle. Map out the full callback chain for create/update/destroy.,Rails Guides - Active Record Callbacks,x,83
 6,1 - Core Deep Dive,Build,Project Setup,"Generate BillFlow app (no scaffold). Create Client model with: name, email, company, phone, notes. Write migration with indexes.",Self-directed,x,89
-7,1 - Core Deep Dive,Build,Project Setup,"Create Project model: belongs_to Client, has name, description, hourly_rate, status (enum: active/archived/completed). Add foreign key constraints.",Self-directed,
+7,1 - Core Deep Dive,Build,Project Setup,"Create Project model: belongs_to Client, has name, description, hourly_rate, status (enum: active/archived/completed). Add foreign key constraints.",Self-directed,x,90
 8,1 - Core Deep Dive,Build,Project Setup,"Create TimeEntry model: belongs_to Project, has description, started_at, ended_at, billable (boolean). Add validation for ended_at > started_at.",Self-directed,
 9,1 - Core Deep Dive,Learn,Migrations & Schema,Study strong_migrations gem. Understand why certain migrations are dangerous. Write complex migrations with conditional indexes.,strong_migrations GitHub README,
 10,1 - Core Deep Dive,Build,Project Models,"Create Invoice model: belongs_to Client, has number (auto-generated), status (draft/sent/paid/overdue), issued_on, due_on, notes. Create LineItem model: belongs_to Invoice, has description, quantity, unit_price.",Self-directed,
