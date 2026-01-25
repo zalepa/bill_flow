@@ -1,0 +1,15 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+acme:
+  name: Joe Acme
+  email: user@acme.com
+  company: Acme Co. 
+  phone: 123-456-7890
+  notes: Important client
+
+globex:
+  name: Jane Globex
+  email: jane@globex.com
+  company: Globex Corporation
+  phone: 987-654-3210
+  notes: VIP client
