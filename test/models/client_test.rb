@@ -38,13 +38,13 @@ class ClientTest < ActiveSupport::TestCase
   end
 
   test "a client can have zero projects" do
-    client = Client.create!(name: "No Projects", email: "test@example.com", company: "No Projects Inc")
+    client = clients(:acme)
+    client.projects.destroy_all
     assert_equal 0, client.projects.count
   end
 
   test "a client can have one or more projects" do
     client = clients(:acme)
-
     client.projects.destroy_all
 
     client.projects.create(name: "Project 1")

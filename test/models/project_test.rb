@@ -41,4 +41,15 @@ class ProjectTest < ActiveSupport::TestCase
       project.status = :invalid_status
     end
   end
+
+  test "can have zero or more time entries" do
+    project = projects(:web)
+    assert_kind_of ActiveRecord::Associations::CollectionProxy, project.time_entries
+
+    project.time_entries = []
+    assert project.valid?
+
+    project.time_entries.create(description: "Hello", started_at: Time.current, ended_at: Time.current + 1.hour, billable: true)
+    assert_equal 1, project.time_entries.count
+  end
 end

@@ -1,0 +1,8 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+thinking:
+  project: web
+  description: Thinking about the project
+  started_at: <%= 2.days.ago.strftime("%Y-%m-%d %H:%M:%S") %>
+  ended_at: <%= 1.day.ago.strftime("%Y-%m-%d %H:%M:%S") %>
+  billable: true

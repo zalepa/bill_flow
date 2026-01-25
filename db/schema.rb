@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_25_194748) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_25_214903) do
   create_table "clients", force: :cascade do |t|
     t.string "company", null: false
     t.datetime "created_at", null: false
@@ -36,5 +36,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_194748) do
     t.index ["name"], name: "index_projects_on_name"
   end
 
+  create_table "time_entries", force: :cascade do |t|
+    t.boolean "billable", default: true, null: false
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.datetime "ended_at"
+    t.integer "project_id", null: false
+    t.datetime "started_at"
+    t.datetime "updated_at", null: false
+    t.index ["project_id"], name: "index_time_entries_on_project_id"
+  end
+
   add_foreign_key "projects", "clients"
+  add_foreign_key "time_entries", "projects"
 end
