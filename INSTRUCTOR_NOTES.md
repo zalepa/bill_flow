@@ -151,3 +151,26 @@ Feedback and observations from code reviews throughout the Rails Mastery project
 **Key takeaway:** Clean implementation that meets all requirements without overcomplication. Good instinct to test cascade deletes through the association chain.
 
 ---
+
+## Day 9 - Strong Migrations & Conditional Indexes (Grade: 86)
+
+**What was done:** Studied strong_migrations gem, understood dangerous migration operations, implemented conditional/partial indexes with verification.
+
+**Strengths:**
+- Good research on strong_migrations purpose and the concept of "dangerous" operations
+- Correctly identified two categories: operations that are hard to undo AND operations that break running applications
+- Excellent practical example of why backfilling in migrations is dangerous (table locks)
+- Hands-on testing with `force: true` to see the gem catch a dangerous operation
+- Went beyond the surface: actually logged into SQLite and used `EXPLAIN QUERY PLAN` to verify the partial index behavior
+- Clear understanding of partial index benefits: reduced storage and faster queries on indexed subset
+- Good example with `add_index :users, :email, where: "status = 1"`
+
+**Areas for improvement:**
+- SQLite limitation not fully explored: strong_migrations is designed for Postgres/MySQL. SQLite doesn't have the same locking issues, so the gem's warnings are less relevant. Important to understand when you hit production.
+- Missed the most common use case: **unique partial indexes for soft deletes** (`unique: true, where: "deleted_at IS NULL"`). This pattern will be useful in BillFlow for ensuring unique constraints only on active records.
+- Didn't explore `safety_assured` blocks - knowing when to override warnings is as important as heeding them
+- No mention of concurrent index creation for Postgres (`algorithm: :concurrently`) which is the fix for the "adding an index non-concurrently" warning
+
+**Key takeaway:** The EXPLAIN QUERY PLAN verification was excellent - this "trust but verify" approach is how you catch real bugs. When you move to Postgres, revisit strong_migrations - the locking issues become very real.
+
+---

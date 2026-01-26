@@ -1,7 +1,8 @@
 # Rails Mastery Journal
 
 ## Day 1
-For the assignment here, I generated a test app and started it as follows using: 
+
+For the assignment here, I generated a test app and started it as follows using:
 
 ```ruby
 rails new test_app
@@ -46,9 +47,10 @@ Started GET "/pages/home" for ::1 at 2026-01-22 17:50:39 -0500
 ```
 
 Here is the GET request coming in an being handled by `ActionDispatch`. So far
-so good. 
+so good.
 
 The next three lines were a little odd:
+
 ```
    (0.2ms)  CREATE TABLE "schema_migrations" ("version" varchar NOT NULL PRIMARY KEY) /*application='TestApp'*/
    (0.1ms)  CREATE TABLE "ar_internal_metadata" ("key" varchar NOT NULL PRIMARY KEY, "value" varchar, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL) /*application='TestApp'*/
@@ -56,17 +58,17 @@ The next three lines were a little odd:
 ```
 
 I assume this is do to Rails checking for migrations that have not yet been run.
-So I tested again by shutting down and restarting the server. 
+So I tested again by shutting down and restarting the server.
 
 The second request, I got no messages about schema migrations. So I restarted
-and did it again and got the same flow. 
+and did it again and got the same flow.
 
 So my thought is this:
 
-Rails must be checking for those two tables to do the migration middleware. The 
-first time it didn't find the tables so it created them. When I restart the 
-server, those tables exist so instead of creating them it queries 
-`schema_migrations` to check for pending migrations. 
+Rails must be checking for those two tables to do the migration middleware. The
+first time it didn't find the tables so it created them. When I restart the
+server, those tables exist so instead of creating them it queries
+`schema_migrations` to check for pending migrations.
 
 So the pseudocode looks something like this:
 
@@ -76,9 +78,9 @@ if migration table does not exist:
   create new tables
 query migration tables
 if migrations exist:
-  throw error 
+  throw error
 else:
-  process request 
+  process request
 ```
 
 Moving on in the request:
@@ -94,7 +96,7 @@ entirely what `*/*` is but when i add `.json` to the URL I get:
 Processing by PagesController#home as JSON
 ```
 
-So this must be the MIME type. So I would revise my assumption to throw in 
+So this must be the MIME type. So I would revise my assumption to throw in
 that Rails also does a MIME type check when determining what template to load.
 
 Next:
@@ -105,13 +107,14 @@ Next:
   Rendered pages/home.html.erb within layouts/application (Duration: 0.1ms | GC: 0.0ms)
   Rendered layout layouts/application.html.erb (Duration: 5.2ms | GC: 1.0ms)
 ```
-So my original flow forgot some stuff. Mainly layouts. Any call to `#render` 
-(either explicit or implied) will first load a layout (`application`) and then 
-the actual page. If there are partials, they would be listed, presumably in the 
-order they appear in the files. Noticeably, we have both `Rendering` and 
+
+So my original flow forgot some stuff. Mainly layouts. Any call to `#render`
+(either explicit or implied) will first load a layout (`application`) and then
+the actual page. If there are partials, they would be listed, presumably in the
+order they appear in the files. Noticeably, we have both `Rendering` and
 `Rendered` which allows for timing analysis (including garbage collection). It
-appears that these render outside in with the template rendering first then the 
-layout rendering after that, which makes sense. 
+appears that these render outside in with the template rendering first then the
+layout rendering after that, which makes sense.
 
 ```sh
 Completed 200 OK in 26ms (Views: 8.5ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 3.1ms)
@@ -122,6 +125,7 @@ Finally, we have the HTTP status code (200) and the timing information.
 ### Claude Comments
 
 **What you nailed:**
+
 - The overall request flow (router → controller → action → view) is correct
 - Good instinct to test the schema_migrations behavior by restarting
 - Correctly identifying `*/*` as the MIME/Accept type and verifying with `.json`
@@ -140,7 +144,7 @@ Rendered pages/home.html.erb within layouts/application   ← template DONE
 Rendered layout layouts/application.html.erb              ← layout DONE
 ```
 
-The layout starts rendering, hits `<%= yield %>`, which triggers the template render, then the layout finishes. It's outside-in *initiation* but inside-out *completion*. The timing confirms this — the layout duration (5.2ms) includes the template duration (0.1ms).
+The layout starts rendering, hits `<%= yield %>`, which triggers the template render, then the layout finishes. It's outside-in _initiation_ but inside-out _completion_. The timing confirms this — the layout duration (5.2ms) includes the template duration (0.1ms).
 
 🟡 **Migration pseudocode** — Your pseudocode says "throw error" for pending migrations. In development, Rails raises `ActiveRecord::PendingMigrationError` which shows a helpful error page — it doesn't silently error. Also worth noting: the middleware responsible is `ActiveRecord::Migration::CheckPending`. This is a good thing to verify on Day 2 when you study the middleware stack with `bin/rails middleware`.
 
@@ -149,8 +153,9 @@ The layout starts rendering, hits `<%= yield %>`, which triggers the template re
 **Grade: 82/100**
 
 ## Day 2
-So...given this is middleware, the "middleware" folder of action_dispatch looked 
-the most interesting plcae to start. 😂 Within that folder, `stack.rb` looked 
+
+So...given this is middleware, the "middleware" folder of action_dispatch looked
+the most interesting plcae to start. 😂 Within that folder, `stack.rb` looked
 most promising. The code there was refreshingly simple:
 
 ```ruby
@@ -160,7 +165,7 @@ def initialize(*args)
 end
 ```
 
-So we store our middleware in a simple array. There also a clear method to 
+So we store our middleware in a simple array. There also a clear method to
 insert a new middleware:
 
 ```ruby
@@ -181,7 +186,7 @@ end
 So now I have some clues, let me see where `MiddlewareStack.new` is called to
 see how middleware is loaded.
 
-In `rails/railties/lib/rails/application.rb` we have what I think is what 
+In `rails/railties/lib/rails/application.rb` we have what I think is what
 goes on:
 
 ```ruby
@@ -215,6 +220,7 @@ def build_stack
               ssl_default_redirect_status: config.action_dispatch.ssl_default_redirect_status
           end
 ```
+
 Curiously, there's no router in here. Maybe the `#draw` method in `Rails.application` does this.
 
 And then, when I run `bin/rails middleware` I get:
@@ -260,8 +266,8 @@ Notably, our routes are at the end here.
 
 So the proposed reading `Rails Guides - Active Record Basics` wasn't super help-
 ful on these two topics, and did not address true connection handling here. So
-I took at a look at the source of ActiveRecord::Base and specifically the 
-`#establish_connection` method. This gives a good example of the imperative 
+I took at a look at the source of ActiveRecord::Base and specifically the
+`#establish_connection` method. This gives a good example of the imperative
 handling of connecting to a database within a Rails app:
 
 ```ruby
@@ -274,7 +280,7 @@ ActiveRecord::Base.establish_connection(
 )
 ```
 
-I know that database connection details are stored in `config/database.yml` as 
+I know that database connection details are stored in `config/database.yml` as
 YAML objects and saw this as well:
 
 ```ruby
@@ -283,8 +289,8 @@ ActiveRecord::Base.establish_connection(:production)
 
 The docs explicitly state:
 
-> In case ActiveRecord::Base.configurations is set (Rails automatically loads 
-> the contents of config/database.yml into it), a symbol can also be given as 
+> In case ActiveRecord::Base.configurations is set (Rails automatically loads
+> the contents of config/database.yml into it), a symbol can also be given as
 > argument, representing a key in the configuration hash.
 
 So I'm curious now how this all wires up in a Rails app.
@@ -293,13 +299,14 @@ It seems like Rails maintains a connection pool via the `ActiveRecord::Connectio
 class. Then, ActiveRecord can lease connections through this pool.
 
 Struggling to find what code is responsible for maintaining this pool. Let's
- start from how to use it. A good example from the docs on `ActiveRecord::Result`:
+start from how to use it. A good example from the docs on `ActiveRecord::Result`:
 
 ```ruby
 result = ActiveRecord::Base.lease_connection.exec_query('SELECT id, title, body FROM posts')
 ```
+
 I would think here that `ActiveRecord::Base` is managing the connection pool.
-Then `lease_connection` asks the pool for a connection. This is probably 
+Then `lease_connection` asks the pool for a connection. This is probably
 some type of Connection object which provides a method to execute a query and
 return a result.
 
@@ -319,7 +326,7 @@ def connection_pool
 end
 ```
 
-This `connection_handler` is an instance of `ConnectionHandler` and it is 
+This `connection_handler` is an instance of `ConnectionHandler` and it is
 created in ActiveRecord::Core.
 
 ```ruby
@@ -330,7 +337,7 @@ This is created when `ActiveRecord::Core` is included in `ActiveRecord::Base`
 which is what all models extend from.
 
 So let's see how this ties to the query interface. Let's use `#find` as an
-example. A quick look shows that `#find` forwards the invocation to 
+example. A quick look shows that `#find` forwards the invocation to
 `#cached_find_by` which is defined by this:
 
 ```ruby
@@ -358,26 +365,25 @@ end
 
 This reads to me as:
 
-1. Call `with_connection` which yields a connection from the connection pool. This is where the connection management is occuring 
-2. Build the statements including the WHERE clauses 
+1. Call `with_connection` which yields a connection from the connection pool. This is where the connection management is occuring
+2. Build the statements including the WHERE clauses
 3. Execute the statement using the leased connection and return the first value
 
 ## Day 4
 
 > Study Arel and how AR builds SQL. Run `to_sql` on complex queries. Practice joins vs includes vs eager_load vs preload. Rails source - activerecord/lib/arel
 
-
-The core of ActiveRecord is with its class methods for issuing SQL statements: `find`, `create`, `update`, `destroy`, etc. So what is “Arel” and how does it fit into this picture. 
+The core of ActiveRecord is with its class methods for issuing SQL statements: `find`, `create`, `update`, `destroy`, etc. So what is “Arel” and how does it fit into this picture.
 
 Arel used to be its [own gem](https://github.com/rails/arel) and has since been moved into ActiveRecord. Looking back before it was merged into ActiveRecord, Arel’s README states:
 
 > Arel is a Relational Algebra for Ruby. It 1) simplifies the generation complex of SQL queries and it 2) adapts to various RDBMS systems. It is intended to be a framework framework; that is, you can build your own ORM with it, focusing on innovative object and collection modeling as opposed to database compatibility and query generation.
 
-A “relational algebra”? Come on, I want to build apps, not do math! But in all seriousness, let’s dig in. 
+A “relational algebra”? Come on, I want to build apps, not do math! But in all seriousness, let’s dig in.
 
-First, why Arel? Why not just do it all in ActiveRecord? Well, [this article](https://thoughtbot.com/blog/using-arel-to-compose-sql-queries) does a good job of explaining and. Its premise is that a hardcoded  `#where` method is great for constructing basic SQL statements.
+First, why Arel? Why not just do it all in ActiveRecord? Well, [this article](https://thoughtbot.com/blog/using-arel-to-compose-sql-queries) does a good job of explaining and. Its premise is that a hardcoded `#where` method is great for constructing basic SQL statements.
 
-```ruby 
+```ruby
 where(foo: nil) # => WHERE foo IS NULL
 where(foo: ['bar', 'baz']) # => WHERE foo IN ('bar', 'baz')
 where(foo: ['bar', 'baz', nil]) # => (WHERE foo IN ('bar', 'baz') OR foo IS NULL)
@@ -385,7 +391,7 @@ where(foo: ['bar', 'baz', nil]) # => (WHERE foo IN ('bar', 'baz') OR foo IS NULL
 
 However, these methods breakdown for more complicated SQL expressions, even things as common as `OR` conditions or algebraic formulae. Arel represents more complicated expressions like this in an abstract syntax tree which is—essentially—a tree of components of a given expression. Arel converts a given SQL intent into a series of “nodes” and arranges these nodes into a tree structure to represent the intent of the entire SQL expression. It then applies a visitor pattern to convert this tree into different output formats (MySQL SQL, Postgresql SQL, and even GraphViz)
 
-The key here is that instead of representing SQL as a very long string, Rails uses Arel to provide a syntax for expression SQL queries in an object oriented way. This is a *lot* of theory, let’s see an example.
+The key here is that instead of representing SQL as a very long string, Rails uses Arel to provide a syntax for expression SQL queries in an object oriented way. This is a _lot_ of theory, let’s see an example.
 
 In a Rails app, we have a Post model:
 
@@ -400,7 +406,7 @@ table = Arel::Table.new(:posts)
 select_manager = table.project(Arel.star)
 ```
 
-If you execute `table.methods` you’ll find some “SQL-y” method names like `where`. The select “manager” here is an object that processes nodes and can be used to construct the AST and generate SQL therefrom. 
+If you execute `table.methods` you’ll find some “SQL-y” method names like `where`. The select “manager” here is an object that processes nodes and can be used to construct the AST and generate SQL therefrom.
 
 Now the fun part. Let’s execute this:
 
@@ -422,7 +428,7 @@ This will return the SQL:
 
 As you can see, we start to build more complex queries using a combination of Ruby methods. The AST is a clean way to construct this type of query without unsafe and difficult string manipulation.
 
-Arel is a pretty undocumented library. But, it is critical to ActiveRecord as ActiveRecord uses it under the hood to handle SQL generation. 
+Arel is a pretty undocumented library. But, it is critical to ActiveRecord as ActiveRecord uses it under the hood to handle SQL generation.
 
 You have to kind of turn back time to see the difference. This is the `#find` method in Rails 2 along with some of the other method invocations.
 
@@ -441,7 +447,7 @@ end
 # ...
 def find_every(options)
   records = scoped?(:find, :include) || options[:include] ?
-    find_with_associations(options) : 
+    find_with_associations(options) :
     find_by_sql(construct_finder_sql(options))
 
   records.each { |record| record.readonly! } if options[:readonly]
@@ -466,9 +472,10 @@ def construct_finder_sql(options)
 end
 ```
 
-Notably, the `#construct_finder_sql` shows how complicated string building can be and how error prone it can be. Further, there was *no* `#where` in Rails 2.0 for chaining together complex queries. Thus, Arel opens a wider range of expressiveness in SQL queries while allowing ActiveRecord to retain a simple interface. 
+Notably, the `#construct_finder_sql` shows how complicated string building can be and how error prone it can be. Further, there was _no_ `#where` in Rails 2.0 for chaining together complex queries. Thus, Arel opens a wider range of expressiveness in SQL queries while allowing ActiveRecord to retain a simple interface.
 
 ### Experimenting with `#to_sql`
+
 Continuing our previous example, I added a `Comment` class which belongs to a Post.
 
 ```
@@ -482,6 +489,7 @@ test-app(dev):021> Post.joins(:comments).where(id: 1).limit(5).offset(1).to_sql
 ```
 
 ### Practice joins vs includes vs eager_load vs preload.
+
 So I added three comments to a post and run this code:
 
 ```ruby
@@ -498,7 +506,7 @@ Post Load (0.3ms)  SELECT "posts".* FROM "posts" LIMIT 10 /*application='TestApp
   Comment Count (1.2ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 1 /*application='TestApp'*/
 3
   Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 2 /*application='TestApp'*/
-  
+
 ```
 
 Let’s see how join, includes, ec. Work:
@@ -514,69 +522,71 @@ Post.limit(10).joins(:comments)
  #<Post:0x00000001294acd18 id: 1, title: "Test", body: "Testing Arel", created_at: "2026-01-24 15:27:12.225206000 +0000", updated_at: "2026-01-24 15:27:12.225206000 +0000">,
  #<Post:0x00000001294acbd8 id: 1, title: "Test", body: "Testing Arel", created_at: "2026-01-24 15:27:12.225206000 +0000", updated_at: "2026-01-24 15:27:12.225206000 +0000">,
  #<Post:0x00000001294aca98 id: 2, title: "Test 2", body: "Another test", created_at: "2026-01-25 01:55:04.034980000 +0000", updated_at: "2026-01-25 01:55:04.034980000 +0000">]
- ```
- 
- So now we have one SQL statement, but we have a but of a mess in the results since we have an array the size of the number of comments for the matching post. This isn’t *really* what we want but shows `join` syntax.
- 
- Let’s move to the others:
- 
- ```sh
- test-app(dev):050> posts = Post.includes(:comments).limit(10); posts.each { |p| puts p.comments.count }
-  Post Load (0.2ms)  SELECT "posts".* FROM "posts" LIMIT 10 /*application='TestApp'*/
-  Comment Load (0.2ms)  SELECT "comments".* FROM "comments" WHERE "comments"."post_id" IN (1, 2) /*application='TestApp'*/
-  Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 1 /*application='TestApp'*/
+```
+
+So now we have one SQL statement, but we have a but of a mess in the results since we have an array the size of the number of comments for the matching post. This isn’t _really_ what we want but shows `join` syntax.
+
+Let’s move to the others:
+
+```sh
+test-app(dev):050> posts = Post.includes(:comments).limit(10); posts.each { |p| puts p.comments.count }
+ Post Load (0.2ms)  SELECT "posts".* FROM "posts" LIMIT 10 /*application='TestApp'*/
+ Comment Load (0.2ms)  SELECT "comments".* FROM "comments" WHERE "comments"."post_id" IN (1, 2) /*application='TestApp'*/
+ Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 1 /*application='TestApp'*/
 3
-  Comment Count (0.0ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 2 /*application='TestApp'*/
+ Comment Count (0.0ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 2 /*application='TestApp'*/
 1
 =>
 [#<Post:0x00000001294a35d8 id: 1, title: "Test", body: "Testing Arel", created_at: "2026-01-24 15:27:12.225206000 +0000", updated_at: "2026-01-24 15:27:12.225206000 +0000">,
- #<Post:0x00000001294a3498 id: 2, title: "Test 2", body: "Another test", created_at: "2026-01-25 01:55:04.034980000 +0000", updated_at: "2026-01-25 01:55:04.034980000 +0000">]
+#<Post:0x00000001294a3498 id: 2, title: "Test 2", body: "Another test", created_at: "2026-01-25 01:55:04.034980000 +0000", updated_at: "2026-01-25 01:55:04.034980000 +0000">]
 test-app(dev):051> posts = Post.preload(:comments).limit(10); posts.each { |p| puts p.comments.count }
-  Post Load (0.3ms)  SELECT "posts".* FROM "posts" LIMIT 10 /*application='TestApp'*/
-  Comment Load (0.2ms)  SELECT "comments".* FROM "comments" WHERE "comments"."post_id" IN (1, 2) /*application='TestApp'*/
-  Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 1 /*application='TestApp'*/
+ Post Load (0.3ms)  SELECT "posts".* FROM "posts" LIMIT 10 /*application='TestApp'*/
+ Comment Load (0.2ms)  SELECT "comments".* FROM "comments" WHERE "comments"."post_id" IN (1, 2) /*application='TestApp'*/
+ Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 1 /*application='TestApp'*/
 3
-  Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 2 /*application='TestApp'*/
+ Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 2 /*application='TestApp'*/
 1
 =>
 [#<Post:0x000000012b62e4c8 id: 1, title: "Test", body: "Testing Arel", created_at: "2026-01-24 15:27:12.225206000 +0000", updated_at: "2026-01-24 15:27:12.225206000 +0000">,
- #<Post:0x000000012b62e388 id: 2, title: "Test 2", body: "Another test", created_at: "2026-01-25 01:55:04.034980000 +0000", updated_at: "2026-01-25 01:55:04.034980000 +0000">]
+#<Post:0x000000012b62e388 id: 2, title: "Test 2", body: "Another test", created_at: "2026-01-25 01:55:04.034980000 +0000", updated_at: "2026-01-25 01:55:04.034980000 +0000">]
 test-app(dev):052> posts = Post.eager_load(:comments).limit(10); posts.each { |p| puts p.comments.count }
-  SQL (0.3ms)  SELECT DISTINCT "posts"."id" FROM "posts" LEFT OUTER JOIN "comments" ON "comments"."post_id" = "posts"."id" LIMIT 10 /*application='TestApp'*/
-  Post Eager Load (0.2ms)  SELECT "posts"."id" AS t0_r0, "posts"."title" AS t0_r1, "posts"."body" AS t0_r2, "posts"."created_at" AS t0_r3, "posts"."updated_at" AS t0_r4, "comments"."id" AS t1_r0, "comments"."content" AS t1_r1, "comments"."post_id" AS t1_r2, "comments"."created_at" AS t1_r3, "comments"."updated_at" AS t1_r4 FROM "posts" LEFT OUTER JOIN "comments" ON "comments"."post_id" = "posts"."id" WHERE "posts"."id" IN (1, 2) /*application='TestApp'*/
-  Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 1 /*application='TestApp'*/
+ SQL (0.3ms)  SELECT DISTINCT "posts"."id" FROM "posts" LEFT OUTER JOIN "comments" ON "comments"."post_id" = "posts"."id" LIMIT 10 /*application='TestApp'*/
+ Post Eager Load (0.2ms)  SELECT "posts"."id" AS t0_r0, "posts"."title" AS t0_r1, "posts"."body" AS t0_r2, "posts"."created_at" AS t0_r3, "posts"."updated_at" AS t0_r4, "comments"."id" AS t1_r0, "comments"."content" AS t1_r1, "comments"."post_id" AS t1_r2, "comments"."created_at" AS t1_r3, "comments"."updated_at" AS t1_r4 FROM "posts" LEFT OUTER JOIN "comments" ON "comments"."post_id" = "posts"."id" WHERE "posts"."id" IN (1, 2) /*application='TestApp'*/
+ Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 1 /*application='TestApp'*/
 3
-  Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 2 /*application='TestApp'*/
+ Comment Count (0.1ms)  SELECT COUNT(*) FROM "comments" WHERE "comments"."post_id" = 2 /*application='TestApp'*/
 1
 =>
 [#<Post:0x000000012b649610 id: 1, title: "Test", body: "Testing Arel", created_at: "2026-01-24 15:27:12.225206000 +0000", updated_at: "2026-01-24 15:27:12.225206000 +0000">,
- #<Post:0x000000012b649110 id: 2, title: "Test 2", body: "Another test", created_at: "2026-01-25 01:55:04.034980000 +0000", updated_at: "2026-01-25 01:55:04.034980000 +0000">]
+#<Post:0x000000012b649110 id: 2, title: "Test 2", body: "Another test", created_at: "2026-01-25 01:55:04.034980000 +0000", updated_at: "2026-01-25 01:55:04.034980000 +0000">]
 test-app(dev):053>
 ```
- 
- We can ignore the `SELECT COUNT(*)` for now but can note the following:
- 
- 1. `include` and `preload` reduce to two queries.
- 2. `eager_load` results in a single query that uses a LEFT OUTER JOIN
 
-All techniques help to reduce the total number of hits to the database which improves performance. 
+We can ignore the `SELECT COUNT(*)` for now but can note the following:
+
+1.  `include` and `preload` reduce to two queries.
+2.  `eager_load` results in a single query that uses a LEFT OUTER JOIN
+
+All techniques help to reduce the total number of hits to the database which improves performance.
 
 ## Day 5
+
 > Study AR callbacks lifecycle. Map out the full callback chain for create/update/destroy.
 
-For any ActiveRecord model, callbacks may be **registered**. These are “ordinary methods, blocks and procs, or defining custom callback objects using classes or modules” that are executed are certain defined points in the object **lifecycle**.  
+For any ActiveRecord model, callbacks may be **registered**. These are “ordinary methods, blocks and procs, or defining custom callback objects using classes or modules” that are executed are certain defined points in the object **lifecycle**.
 
-### Registration Methods 
-Call backs can be limited to specific lifecycle events using `:on`  when registering a callback:
+### Registration Methods
+
+Call backs can be limited to specific lifecycle events using `:on` when registering a callback:
 
 ```ruby
 before_validation :ensure_username_has_value, on: :create
-# or 
+# or
 after_validation :set_location, on: [ :create, :update ]
 ```
 
-
 #### Macro-style
+
 One of the most common is **macro-style** callback registration which entails calling a class method and passing a symbol:
 
 ```ruby
@@ -585,18 +595,20 @@ before_validation :ensure_username_has_value
 
 During the object lifecycle, ActiveRecord will call the `#ensure_username_has_value` method before validating an ActiveRecord object. These methods should generally be private on the model instance.
 
-#### Block Style 
+#### Block Style
+
 For shorter hooks, the callback registration method supports a block style syntax:
 
 ```ruby
 before_validation do
   self.username = email if username.blank?
 end
-``` 
+```
 
-This is generally preferable for single-line hook bodies as it can clutter the model definitions. 
+This is generally preferable for single-line hook bodies as it can clutter the model definitions.
 
 #### Proc-style
+
 As an alternative to block style, proc-style can be used:
 
 ```ruby
@@ -604,6 +616,7 @@ before_validation ->(user) { user.username = user.email if user.username.blank?
 ```
 
 ### Custom Callback Object
+
 For more advanced or involved callbacks, you can also define a custom class that includes a corresponding hook method:
 
 ```ruby
@@ -625,9 +638,11 @@ end
 Such a technique is useful if the callback logic is particularly complex. It also supports file-level separation of concerns.
 
 ### Overall Function
+
 Callbacks are generally implemented as hooks surrounding an event. Most callbacks have corresponding “before” and “after” hooks that surround the underlying event. ==Callbacks are only available on the `#create`, `#update`, and `#destroy` actions.== The `#create` and `#update` hooks are very similar while the `#destroy` hooks are much simplified.
 
 ### Create
+
 Below is an example class with all `#create` hooks added.
 
 ```ruby
@@ -679,14 +694,14 @@ end
 
 All we are doing here is adding a simple log message in each callback to illustrate the chain. Now let’s call some methods.
 
-First, let’s illustrate when the callbacks are *not* called, using `#new`:
+First, let’s illustrate when the callbacks are _not_ called, using `#new`:
 
 ```
 test-app(dev):005> Post.new(title: "Test", body: "Test")
 => #<Post:0x0000000126cef1e0 id: nil, title: "Test", body: "Test", created_at: nil, updated_at: nil>
 ```
 
-The create call backs are not called here because we don’t actually hit the database or do any validations. 
+The create call backs are not called here because we don’t actually hit the database or do any validations.
 
 But let’s try to validate:
 
@@ -700,7 +715,7 @@ Hello, I'm in the after_validation callback
 test-app(dev):008>
 ```
 
-Here the `before_validation` and `after_validation` call backs run. Notably, this would happen also on update. 
+Here the `before_validation` and `after_validation` call backs run. Notably, this would happen also on update.
 
 Now, let’s try to save this object `p`:
 
@@ -742,7 +757,7 @@ Hello, I'm after the around_save callback (#<Post id: nil, title: "Test", body: 
 Hello, I'm in the after_save callback
 ```
 
-I included the `self.inspect` call to show that after the yield, the object has be persisted and receives its timestamp updates. Thus, `around_*` calls are useful when you need to perform logic before *and* after the hook. I would presume this is to maintain some sort of tracking or handle some sort of persistence-level issue that separate before and after hooks can’t handle
+I included the `self.inspect` call to show that after the yield, the object has be persisted and receives its timestamp updates. Thus, `around_*` calls are useful when you need to perform logic before _and_ after the hook. I would presume this is to maintain some sort of tracking or handle some sort of persistence-level issue that separate before and after hooks can’t handle
 
 Finally, let’s check the `#create` method:
 
@@ -770,11 +785,11 @@ Here we have the whole chain:
 
 1. before_validation (essentially the initial state)
 2. after_validation (now will have validation errors)
-3. around_save (before `yield`) 
+3. around_save (before `yield`)
 4. before_save
 5. around_create (before `yield`) (will have timestamps from #save)
 6. before_create (last chance before hitting database)
-7. around_create  (after `yield`) (will now have database id for rest of call backs)
+7. around_create (after `yield`) (will now have database id for rest of call backs)
 8. after_create
 9. around_save (before `yield`)
 10. after_save
@@ -782,9 +797,10 @@ Here we have the whole chain:
 
 Of note is the `after_commit` call back. In Rails, all operations that modify the database (create, read, update) are wrapped in a transaction so that they can be rolled back if any errors occur. This `after_commit` hook is called after the transation is committed to the database. Similarly, the `after_rollback` commit (not illustrated above) is executed if the transaction fails and Rails has to rollback the transction. This could, as one example, be useful for logging errors related to the transaction.
 
-It should be noted that the *_validation callbacks will also be called when you call `model.valid?` and other vlidtaion methods. In that instance the create/update callbacks won't be called until you create or update. Also note that you can bypass the validation callbacks by saving without validation (`p.save(validate: false)`)
+It should be noted that the \*\_validation callbacks will also be called when you call `model.valid?` and other vlidtaion methods. In that instance the create/update callbacks won't be called until you create or update. Also note that you can bypass the validation callbacks by saving without validation (`p.save(validate: false)`)
 
 ### Update
+
 Many of the callbacks here are similar to `#create`, so we will just add three new ones to our model:
 
 ```ruby
@@ -897,11 +913,229 @@ So the before/after and around are inverted here.
 There are some other hooks to be aware of:
 
 #### after_initialize, after_find, after_touch
-* after_initialize: This is called after you call Model.new 
-* after_find: This is called after finder methods like find, first, last, etc. 
-* after_touch: called when executing `instance.touch`
-Notably, when you call a finder method you will find and initialize an object so they are executed like this:
+
+- after_initialize: This is called after you call Model.new
+- after_find: This is called after finder methods like find, first, last, etc.
+- after_touch: called when executing `instance.touch`
+  Notably, when you call a finder method you will find and initialize an object so they are executed like this:
 
 1. after_find
 2. after_initialize
 
+## Day 9: Strong Migrations
+
+Today's task is:
+
+Study strong_migrations gem. Understand why certain migrations are dangerous.
+Write complex migrations with conditional indexes.
+
+I'll be honest, I've never heard of this gem before, so this is a good learning
+experience. Let's check out the [repo](https://github.com/ankane/strong_migrations).
+The goals there list:
+
+- Detects potentially dangerous operations
+- Prevents them from running by default
+- Provides instructions on safer ways to do what you want
+
+The key question is: what is a "dangerous operation"? Well, fortunately the
+README provides a good list:
+
+Potentially dangerous operations:
+
+- removing a column
+- changing the type of a column
+- renaming a column
+- renaming a table
+- creating a table with the force option
+- adding an auto-incrementing column
+- adding a stored generated column
+- adding a check constraint
+- executing SQL directly
+- backfilling data
+
+Postgres-specific checks:
+
+- adding an index non-concurrently
+- adding a reference
+- adding a foreign key
+- adding a unique constraint
+- adding an exclusion constraint
+- adding a json column
+- setting NOT NULL on an existing column
+- adding a column with a volatile default value
+- renaming a schema
+
+Best practices:
+
+- keeping non-unique indexes to three columns or less
+
+So, "dangerous" here seems to mean (and I am admittedly generalizing here), an
+operation that makes a change to the database that is difficult or impossible
+to "undo" or will cause errors in your application.
+
+For example, removing a column is both impossible to "undo" easily since the
+data will be lost and adding the column back will result in null or default
+values. More importantly for this gem, removing a column will cause errors since
+the application likely relies on the column to work.
+
+There's also other dangerous operations that do not necessarily make an
+application fail but are problematic for other reasons. For example, the
+backfilling data notification is based on the premise that including data
+access commands in a migration will lock the database for a long period of time:
+
+```ruby
+class AddSomeColumnToUsers < ActiveRecord::Migration[8.1]
+  def change
+    add_column :users, :some_column, :text
+    User.update_all some_column: "default_value"
+  end
+end
+```
+
+Here, the call to `#update_all` will result in the migration locking the table
+for the entire migration. For an active application this would result in a
+lack of access by the application running in production.
+
+So, let's use it in an app. First we'll install the gem:
+
+```sh
+bundle install
+rails generate strong_migrations:install
+```
+
+Now, let's make a simple User model (ignore no passwords, etc.):
+
+```sh
+rails g model User name:string email:string
+```
+
+And let's modify this migration quickly:
+
+```ruby
+class CreateUsers < ActiveRecord::Migration[8.1]
+  def change
+    create_table :users, force: true do |t|
+      t.string :name
+      t.string :email
+
+      t.timestamps
+    end
+  end
+end
+```
+
+We add `force: true` here to see strong_migrations in action:
+
+```sh
+$ bin/rails db:migrate
+== 20260126144623 CreateUsers: migrating ======================================
+[strong_migrations] Unsupported adapter: SQLite. Use StrongMigrations.skip_database(:primary) to silence this warning.
+bin/rails aborted!
+StandardError: An error has occurred, this and all later migrations canceled: (StandardError)
+
+=== Dangerous operation detected #strong_migrations ===
+
+The force option will destroy existing tables.
+If this is intended, drop the existing table first.
+In any case, remove the force option.
+
+/Users/george/code/rails/test_app/db/migrate/20260126144623_create_users.rb:3:in 'CreateUsers#change'
+Tasks: TOP => db:migrate
+(See full trace by running task with --trace)
+```
+
+This is what is expected, the gem detects the dangerous line (`force: true`) and
+stops the migration as well as gives advise on how to properly run the migration.
+
+Now, the next part of today is about creating a complex migration using a
+"conditional index". I will admit, I have no idea what a conditional index is.
+My assumption is it is some type of index that only applies to certain records
+based on some type of conditional logic, but I will need to dig in here.
+
+So, the first thing I found on Google is an alternate name: "partial index" and
+I can find that in the [Rails Documentation](https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/SchemaStatements.html#method-i-add_index).
+This provides a good example of how to do this in Rails:
+
+```ruby
+add_index(:accounts, [:branch_id, :party_id], unique: true, where: "active")
+```
+
+This would generate the following SQL:
+
+```sql
+CREATE UNIQUE INDEX index_accounts_on_branch_id_and_party_id ON accounts(branch_id, party_id) WHERE active
+```
+
+So, here we are indexing on two columns (`branch_id, party_id`) to ensure
+uniqueness but we are not indexing all rows of data, only those where the
+`active` column is true. You can imagine that the `WHERE` clause here can
+get more complicated than simple a Boolean check.
+
+So let's try this out:
+
+```ruby
+class CreateUsers < ActiveRecord::Migration[8.1]
+  def change
+    create_table :users do |t|
+      t.string :name
+      t.string :email
+      t.integer :status
+
+      t.timestamps
+    end
+
+    add_index :users, :email, where: "status = 1"
+  end
+end
+```
+
+Here, I would imagine this SQL being generated:
+
+```sql
+CREATE INDEX index_users_on_email ON users(email) WHERE status = 1;
+```
+
+Looking at the development log, I'm seeing:
+
+```sh
+(0.3ms)  CREATE TABLE "users" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "email" varchar, "status" integer, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL) /*application='TestApp'*/
+(0.0ms)  CREATE INDEX "index_users_on_email" ON "users" ("email") WHERE status = 1 /*application='TestApp'*/
+```
+
+So that makes sense! But let's see what's happening under the hood. I'll make
+two users:
+
+```ruby
+User.create(name: "Test", email: "Hello", status: 1)
+User.create(name: "Test", email: "Hello", status: 0)
+```
+
+Then I'll loginto the database:
+
+```sh
+sqlite3 storage/development.sqlite3
+```
+
+Then we'll inspect the table:
+
+```
+sqlite> EXPLAIN QUERY PLAN
+   ...> SELECT * FROM users WHERE email = 'Hello' AND status = 1;
+QUERY PLAN
+`--SEARCH users USING INDEX index_users_on_email (email=?)
+sqlite> EXPLAIN QUERY PLAN
+   ...> SELECT * FROM users WHERE email = 'Hello' AND status = 0;
+QUERY PLAN
+`--SCAN users
+```
+
+Here, we note the difference in the query plans. When accessing the indexed
+column (status = 1) we can search using the index whereas otherwise we have
+to scan all rows of the database.
+
+I can see now how conditional indexes work. They can significantly reduce the
+storage requirements of an index if there's a clear dichotomy between what
+should and should not be indexed. If we indexed without condition we would
+index all rows, which may not be necessary if we are only interested in rows
+with a certain condition attached. It also increases performance since there
+is less data to scan here.
