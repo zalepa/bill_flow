@@ -130,3 +130,24 @@ Feedback and observations from code reviews throughout the Rails Mastery project
 **Key takeaway:** Think through data requirements upfront - which fields are required vs optional, what validations does the data need - before writing the first version.
 
 ---
+
+## Day 8 - TimeEntry Model (Grade: 91)
+
+**What was built:** TimeEntry model with belongs_to Project, description, started_at, ended_at, billable boolean. Custom validation for ended_at > started_at. Helper methods for duration calculation.
+
+**Strengths:**
+- Solid migration with proper foreign key constraint, `null: false` on required fields, sensible default for `billable`
+- Inline comments in migration explaining rationale (e.g., why billable is `null: false`)
+- Custom validation `ended_at_after_started_at` correctly handles nil cases and rejects equal timestamps
+- `minutes` and `hours` helper methods handle edge cases (nil timestamps) with safe defaults
+- Proactively added cascade delete tests to both Client and Project test files
+- Association wired up correctly both directions with `dependent: :destroy` on Project
+
+**Areas for improvement:**
+- Fixture has a 24-hour time entry (2.days.ago to 1.day.ago) - more realistic durations (1-2 hours) make tests easier to reason about
+- `hours` method returns raw Float which could produce values like `1.4999999999` - consider `.round(2)` for display purposes
+- `minutes` and `hours` methods weren't required for Day 8 (they're part of Day 11's `TimeEntry#duration`) - not wrong, just early
+
+**Key takeaway:** Clean implementation that meets all requirements without overcomplication. Good instinct to test cascade deletes through the association chain.
+
+---

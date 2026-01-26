@@ -52,4 +52,21 @@ class ProjectTest < ActiveSupport::TestCase
     project.time_entries.create(description: "Hello", started_at: Time.current, ended_at: Time.current + 1.hour, billable: true)
     assert_equal 1, project.time_entries.count
   end
+
+  test "destroying project destroys associated time entries" do
+    project = projects(:web)
+
+    project.time_entries.destroy_all
+
+    project.time_entries.create!(
+      description: "Work",
+      started_at: Time.current,
+      ended_at: Time.current + 1.hour,
+      billable: true
+    )
+
+    assert_difference "TimeEntry.count", -1 do
+      project.destroy
+    end
+  end
 end

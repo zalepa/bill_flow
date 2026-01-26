@@ -53,4 +53,23 @@ class ClientTest < ActiveSupport::TestCase
     client.projects.create(name: "Project 2")
     assert_equal 2, client.projects.count
   end
+
+  test "destroying client destroys associated projects and time entries" do
+    client = clients(:acme)
+
+    client.projects.destroy_all
+
+    project = client.projects.create(name: "Project 1")
+
+    project.time_entries.create!(
+      description: "Work",
+      started_at: Time.current,
+      ended_at: Time.current + 1.hour,
+      billable: true
+    )
+
+    assert_difference [ "TimeEntry.count", "Project.count" ], -1 do
+      client.destroy
+    end
+  end
 end
