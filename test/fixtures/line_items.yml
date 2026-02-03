@@ -1,0 +1,7 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+web:
+  invoice: good
+  description: Web design services
+  quantity: 1
+  unit_price: 100

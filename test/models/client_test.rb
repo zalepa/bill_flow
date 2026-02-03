@@ -72,4 +72,27 @@ class ClientTest < ActiveSupport::TestCase
       client.destroy
     end
   end
+
+  test "a client can have one or more invoices" do
+    client = clients(:acme)
+    client.invoices.destroy_all
+
+    client.invoices.create(number: 1, status: :draft)
+    assert_equal 1, client.invoices.count
+
+    client.invoices.create(number: 2, status: :draft)
+    assert_equal 2, client.invoices.count
+  end
+
+  test "destroying client destroys associated invoices" do
+    client = clients(:acme)
+
+    client.invoices.destroy_all
+
+    invoice = client.invoices.create(number: 1, status: :draft)
+
+    assert_difference [ "Invoice.count" ], -1 do
+      client.destroy
+    end
+  end
 end

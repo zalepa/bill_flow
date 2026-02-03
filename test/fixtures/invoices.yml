@@ -1,0 +1,9 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+good:
+  client: acme
+  number: 1234
+  status: 0
+  issued_on: 2026-02-03
+  due_on: 2026-02-04
+  notes: Check on in 30 days 

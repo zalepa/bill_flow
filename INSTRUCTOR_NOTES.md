@@ -174,3 +174,28 @@ Feedback and observations from code reviews throughout the Rails Mastery project
 **Key takeaway:** The EXPLAIN QUERY PLAN verification was excellent - this "trust but verify" approach is how you catch real bugs. When you move to Postgres, revisit strong_migrations - the locking issues become very real.
 
 ---
+
+## Day 10 - Invoice & LineItem Models (Grade: 87)
+
+**What was built:** Invoice model (belongs_to Client, status enum, scoped number uniqueness, conditional date validations) and LineItem model (belongs_to Invoice, description, quantity, unit_price in cents). Migrations with foreign keys, indexes, and sensible defaults. Updated Client model with `has_many :invoices`. Full test suite — 25 tests, 106 assertions, all passing.
+
+**Strengths:**
+- Conditional validation on `issued_on` and `due_on` (required unless draft) shows strong domain understanding — drafts shouldn't require dates that only matter when sending
+- Correct scoped uniqueness: `uniqueness: { scope: :client_id }` paired with composite unique index `[:client_id, :number]` — both the application-level and database-level constraints are in sync
+- Well-tested scoped uniqueness: verified that a duplicate number for the same client fails, but the same number for a different client passes
+- Custom `due_date_after_issued_date` validator properly handles nil cases with early return
+- Consistent money-as-cents pattern from Day 7 applied to `unit_price`
+- Good index choices: composite unique on `[client_id, number]`, simple index on `status` for query filtering
+- LineItem validations are well-considered: quantity must be > 0, unit_price >= 0 (allows display of free items)
+- Cascade delete tests continue the good habit established in Day 8
+
+**Areas for improvement:**
+- `validates :client, presence: true` is redundant with `belongs_to :client` (Rails 5+ auto-validates presence on belongs_to). Remove it to avoid confusion.
+- Invoice fixture has `due_on == issued_on` which would fail the custom validation if the record were ever updated. Fixtures bypass validations on load, making this a hidden landmine.
+- Client test "destroying client destroys associated invoices" incorrectly asserts `Project.count` alongside `Invoice.count` — passes by accident due to fixture data, but tests the wrong thing.
+- `unit_price` column should be `unit_price_cents` to make the unit explicit (same advice as Day 7's `hourly_rate`).
+- `quantity` as integer may be limiting for fractional hours (e.g., 1.5 hours of consulting). Worth considering decimal before Day 11 builds `Invoice#total`.
+
+**Key takeaway:** The conditional draft validation is the standout decision here — it shows you're thinking about the domain workflow (create draft → fill in details → send) rather than just enforcing presence on everything. The scoped uniqueness with matching database constraint is textbook correct.
+
+---

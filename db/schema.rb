@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_25_214903) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_03_155609) do
   create_table "clients", force: :cascade do |t|
     t.string "company", null: false
     t.datetime "created_at", null: false
@@ -22,6 +22,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_214903) do
     t.index ["company"], name: "index_clients_on_company"
     t.index ["email"], name: "index_clients_on_email", unique: true
     t.index ["name"], name: "index_clients_on_name"
+  end
+
+  create_table "invoices", force: :cascade do |t|
+    t.integer "client_id", null: false
+    t.datetime "created_at", null: false
+    t.date "due_on"
+    t.date "issued_on"
+    t.text "notes", default: ""
+    t.integer "number", null: false
+    t.integer "status", default: 0
+    t.datetime "updated_at", null: false
+    t.index ["client_id", "number"], name: "index_invoices_on_client_id_and_number", unique: true
+    t.index ["client_id"], name: "index_invoices_on_client_id"
+    t.index ["status"], name: "index_invoices_on_status"
+  end
+
+  create_table "line_items", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.integer "invoice_id", null: false
+    t.integer "quantity", default: 1
+    t.integer "unit_price", default: 0
+    t.datetime "updated_at", null: false
+    t.index ["invoice_id"], name: "index_line_items_on_invoice_id"
   end
 
   create_table "projects", force: :cascade do |t|
@@ -47,6 +71,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_214903) do
     t.index ["project_id"], name: "index_time_entries_on_project_id"
   end
 
+  add_foreign_key "invoices", "clients"
+  add_foreign_key "line_items", "invoices"
   add_foreign_key "projects", "clients"
   add_foreign_key "time_entries", "projects"
 end
