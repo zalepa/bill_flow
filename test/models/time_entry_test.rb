@@ -34,4 +34,24 @@ class TimeEntryTest < ActiveSupport::TestCase
     time_entry.ended_at = time_entry.started_at + 90.minutes
     assert_equal 1.5, time_entry.hours
   end
+
+  test "#duration is an alias for #minutes" do
+    time_entry = time_entries(:thinking)
+    time_entry.ended_at = time_entry.started_at + 45.minutes
+    assert_equal time_entry.minutes, time_entry.duration
+  end
+
+  test "billable scope returns items with and ended_at time set and a duration > 0" do
+    entry = time_entries(:thinking)
+    entry.update!(billable: true)
+    assert_includes TimeEntry.billable, entry
+
+    entry = time_entries(:thinking)
+    entry.update!(billable: true)
+    assert_includes TimeEntry.billable, entry
+
+    entry = time_entries(:thinking)
+    entry.update!(billable: false)
+    assert_not_includes TimeEntry.billable, entry
+  end
 end

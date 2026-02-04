@@ -171,4 +171,50 @@ class InvoiceTest < ActiveSupport::TestCase
       invoice.destroy
     end
   end
+
+  test "#total returns the total amount of line items" do
+    invoice = invoices(:good)
+    invoice.line_items.destroy_all
+
+    assert_equal 0, invoice.total
+
+    invoice.line_items.create(description: "Item 1", quantity: 2, unit_price: 100) # 200
+    invoice.line_items.create(description: "Item 2", quantity: 3, unit_price: 150) # 450
+
+    assert_equal 650, invoice.total
+  end
+
+  test "#generate_number generates a unique invoice number for a client" do
+    client = clients(:acme)
+    existing_numbers = client.invoices.pluck(:number)
+
+    new_invoice = Invoice.new(client: client)
+    new_invoice.generate_number
+
+    assert_not_includes existing_numbers, new_invoice.number
+
+    new_invoice.save
+
+    another_invoice = Invoice.new(client: client)
+    another_invoice.generate_number
+    assert_not_equal new_invoice.number, another_invoice.number
+    assert_not_includes existing_numbers, another_invoice.number
+  end
+
+  test "overdue scope returns invoices past due date and not paid" do
+    invoice = invoices(:good)
+    invoice.issued_on = Date.today - 60
+    invoice.due_on = Date.today - 1
+    invoice.status = :overdue
+    invoice.save!
+
+    assert_equal 1, Invoice.overdue.count
+
+    # Test malformed entry
+    invoice.status = :sent
+    invoice.issued_on = Date.today - 60
+    invoice.due_on = Date.today - 1
+    invoice.save!
+    assert_equal 1, Invoice.overdue.count
+  end
 end

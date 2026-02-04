@@ -55,4 +55,11 @@ class LineItemTest < ActiveSupport::TestCase
     assert_not line_item.valid?
     assert_includes line_item.errors[:unit_price], "must be greater than or equal to 0"
   end
+
+  test "#total returns the total value for a line item" do
+    line_item = line_items(:web)
+    line_item.quantity = 3
+    line_item.unit_price = 150
+    assert_equal 450, line_item.total
+  end
 end

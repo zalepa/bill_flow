@@ -199,3 +199,27 @@ Feedback and observations from code reviews throughout the Rails Mastery project
 **Key takeaway:** The conditional draft validation is the standout decision here — it shows you're thinking about the domain workflow (create draft → fill in details → send) rather than just enforcing presence on everything. The scoped uniqueness with matching database constraint is textbook correct.
 
 ---
+
+## Day 11 - Model Methods & Scopes (Grade: 80)
+
+**What was built:** `Invoice#total`, `Invoice#generate_number`, `TimeEntry#duration` (alias to `minutes`), `LineItem#total`, and three scopes: `Invoice.overdue`, `Project.active`, `TimeEntry.billable`. 43 tests, 153 assertions, 1 failure.
+
+**Strengths:**
+- `LineItem#total` is clean — `quantity * unit_price`, no unnecessary complexity
+- `TimeEntry#duration` aliased to `minutes` is pragmatic — reuses existing, tested code
+- The `# redundant?` comments on enum-generated scopes show the student is actively questioning whether code adds value
+- Billable scope test is thorough — tests positive case, nil `ended_at` case, and the transition from non-billable to billable
+- `generate_number` test correctly verifies uniqueness across multiple invocations
+- Good zero-line-items edge case test for `Invoice#total`
+
+**Areas for improvement:**
+- **Failing test (overdue scope):** Test modifies invoice status and due_on in memory but never calls `save!`. Scopes query the database, not in-memory objects. Fundamental concept gap that needs to be understood.
+- **Redundant scopes:** `Invoice.overdue` and `Project.active` duplicate what Rails enums auto-generate. The student noticed this (good instinct) but didn't act on it. A real `overdue` scope should encode business logic: `where(status: :sent).where("due_on < ?", Date.current)` — discovering overdue invoices vs. filtering already-tagged ones.
+- **`TimeEntry.billable` ignores the `billable` boolean column:** The scope filters by `ended_at IS NOT NULL AND ended_at > started_at` (completed entries with positive duration), but the model has a `billable` boolean column for exactly this purpose. A completed internal meeting marked `billable: false` would incorrectly appear in this scope.
+- **`generate_number` loads a full record unnecessarily:** `client.invoices.order(number: :desc).first` loads an entire AR object to read one integer. Use `client.invoices.maximum(:number)` instead — single `SELECT MAX()` query, no while loop needed.
+- **Scope placed after `private` keyword:** `invoice.rb:33` — scopes are class methods so `private` doesn't affect them, but placing it there is misleading. Convention is scopes near the top with other class-level declarations.
+- **`Invoice#total` calculates in Ruby:** `line_items.sum(&:total)` loads all records into memory. `line_items.sum("quantity * unit_price")` does it in SQL. Not critical at this scale but worth knowing.
+
+**Recurring pattern:** The student has good instincts (noticed redundancy, wrote thorough tests) but doesn't always follow through on those instincts. The `# redundant?` comment should have led to either removing the scope or implementing a more meaningful version.
+
+**Key takeaway:** Scopes query the database — always ensure test data is persisted before asserting on scope results. When defining scopes, think about what business logic they should encode beyond simple column filtering, especially when Rails already provides the simple version via enums.

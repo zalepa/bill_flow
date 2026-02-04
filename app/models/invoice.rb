@@ -8,6 +8,21 @@ class Invoice < ApplicationRecord
   validates :issued_on, presence: true, unless: :draft?
   validates :due_on, presence: true, unless: :draft?
 
+  scope :overdue, -> { where("due_on < ? AND status != ?", Date.today, statuses[:paid]) }
+
+  def total
+    line_items.sum(&:total)
+  end
+
+  def generate_number
+    last_invoice = client.invoices.order(number: :desc).first
+    self.number = last_invoice ? last_invoice.number + 1 : 1001
+    # check if number is unique for the client
+    while client.invoices.exists?(number: number)
+      self.number += 1
+    end
+  end
+
   private
 
   def due_date_after_issued_date

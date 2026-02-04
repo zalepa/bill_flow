@@ -3,6 +3,8 @@ class TimeEntry < ApplicationRecord
   validates :description, presence: true
   validate :ended_at_after_started_at
 
+  scope :billable, -> { where(billable: true) }
+
   def minutes
     return 0 if ended_at.blank? || started_at.blank?
 
@@ -24,4 +26,6 @@ class TimeEntry < ApplicationRecord
       errors.add(:ended_at, "must be after the start time")
     end
   end
+
+  alias :duration :minutes
 end

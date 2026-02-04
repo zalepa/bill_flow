@@ -69,4 +69,16 @@ class ProjectTest < ActiveSupport::TestCase
       project.destroy
     end
   end
+
+  test "active scope only returns active projects" do
+    project = projects(:web)
+    project.active! # ensure the project is active
+
+    active_projects = Project.active
+    assert_equal 1, active_projects.count
+
+    project.archived!
+    active_projects = Project.active
+    assert_equal 0, active_projects.count
+  end
 end
